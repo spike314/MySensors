@@ -1024,16 +1024,18 @@
  * @brief These options are specific to the %SX126x family of wireless transport modules.
  *
  * The following chips are supported by this driver:
- * - Semtech sx1261
- * - Semtech sx1262
+ * - Semtech sx1261 (SX126x)
+ * - Semtech sx1262 (SX126x)
+ * - STM32WL Series (RLSX126x)
  * @{
  */
 
 /**
- * @def MY_RADIO_SX126x
- * @brief Define this to use SX126x based radios for sensor network communication.
+ * @def MY_RADIO_SX126x or MY_RADIO_RLSX126x
+ * @brief Define this to use SX126x based radios for sensor network communication.  Use RLSX126x for RadioLib based version
  */
 //#define MY_RADIO_SX126x
+//#define MY_RADIO_RLSX126x
 
 /**
  * @def MY_SX126x_CS_PIN
@@ -1189,7 +1191,7 @@
  * If not set, sx1262 is selected
  */
 #if !defined(MY_SX126x_VARIANT)
-#define MY_SX126x_VARIANT (1)
+#define MY_SX126x_VARIANT (2)
 #endif
 
 /**
@@ -2555,7 +2557,7 @@
 #endif
 
 // Enable sensor network "feature" if one of the transport types was enabled
-#if defined(MY_RADIO_RF24) || defined(MY_RADIO_NRF5_ESB) || defined(MY_RADIO_RFM69) || defined(MY_RADIO_RFM95) || defined(MY_RADIO_SX126x) || defined(MY_RS485) || defined(MY_PJON)
+#if defined(MY_RADIO_RF24) || defined(MY_RADIO_NRF5_ESB) || defined(MY_RADIO_RFM69) || defined(MY_RADIO_RFM95) || defined(MY_RADIO_SX126x) || defined(MY_RS485) || defined(MY_PJON) || defined(MY_RADIO_RLSX126x)
 #define MY_SENSOR_NETWORK
 #endif
 
@@ -2771,6 +2773,7 @@
 #define MY_RFM95_MAX_POWER_LEVEL_DBM
 // SX126x
 #define MY_RADIO_SX126x
+#define MY_RADIO_RLSX126x
 #define MY_SX126x_TCXO_VOLTAGE
 #define MY_SX126c_TCXO_STARTUP_DELAY
 #define MY_SX126x_USE_TCXO

@@ -299,7 +299,7 @@ MY_DEFAULT_RX_LED_PIN in your sketch instead to enable LEDs
 #else
 #define _PJONCNT 0	//!< _PJONCNT
 #endif
-#if defined(MY_RADIO_SX126x)
+#if defined(MY_RADIO_SX126x) || defined(MY_RADIO_RLSX126x)
 #define __SX126xCNT 1   //!< __SX126xCNT
 #else
 #define __SX126xCNT 0   //!< __SX126xCNT
@@ -315,7 +315,7 @@ MY_DEFAULT_RX_LED_PIN in your sketch instead to enable LEDs
 #endif
 
 // TRANSPORT INCLUDES
-#if defined(MY_RADIO_RF24) || defined(MY_RADIO_NRF5_ESB) || defined(MY_RADIO_RFM69) || defined(MY_RADIO_RFM95) || defined(MY_RS485) || defined (MY_PJON) || defined(MY_RADIO_SX126x)
+#if defined(MY_RADIO_RF24) || defined(MY_RADIO_NRF5_ESB) || defined(MY_RADIO_RFM69) || defined(MY_RADIO_RFM95) || defined(MY_RS485) || defined (MY_PJON) || defined(MY_RADIO_SX126x)  || defined(MY_RADIO_RLSX126x)
 #include "hal/transport/MyTransportHAL.h"
 #include "core/MyTransport.h"
 
@@ -409,6 +409,9 @@ MY_DEFAULT_RX_LED_PIN in your sketch instead to enable LEDs
 #elif defined(MY_RADIO_SX126x)
 #include "hal/transport/SX126x/driver/SX126x.cpp"
 #include "hal/transport/SX126x/MyTransportSX126x.cpp"
+#elif defined(MY_RADIO_RLSX126x)
+#include "hal/transport/RLSX126x/driver/RLSX126x.cpp"
+#include "hal/transport/RLSX126x/MyTransportRLSX126x.cpp"
 #endif
 
 #if (defined(MY_RF24_ENABLE_ENCRYPTION) && defined(MY_RADIO_RF24)) || (defined(MY_NRF5_ESB_ENABLE_ENCRYPTION) && defined(MY_RADIO_NRF5_ESB)) || (defined(MY_RFM69_ENABLE_ENCRYPTION) && defined(MY_RADIO_RFM69)) || (defined(MY_RFM95_ENABLE_ENCRYPTION) && defined(MY_RADIO_RFM95))
