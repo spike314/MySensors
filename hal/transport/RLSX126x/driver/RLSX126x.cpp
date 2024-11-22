@@ -111,11 +111,12 @@ static bool SX126x_initialise()
 
 
 
-	// Antenna RX/TX switch logic
+	// Antenna RX/TX switch logic and TXCO for STM32WL
 #if defined(STM32WLxx)
 	// For STM32WL
 	// set RF switch control configuration
 	// this has to be done prior to calling begin()
+#define MY_SX126x_TCXO_VOLTAGE (1.7)  //This is the TCXO voltage for E5 module
 
 	radio1.setRfSwitchTable(rfswitch_pins, rfswitch_table);
 #else
@@ -172,13 +173,13 @@ static void SX126x_interruptHandler()
 
 static void SX126x_handle()
 {
-#ifdef MY_SX126x_IRQ_PIN  // TODO:  Ensure this is defined when using STM32WLxx
+#ifdef MY_SX126x_IRQ_PIN 
 	if (SX126x.irqFired) {
 #endif
 		uint32_t irqStatus = RADIOLIB_SX126X_IRQ_NONE;
 		//get the interrupt fired
 		irqStatus = radio1.getIrqFlags();
-		// SX126x_DEBUG(PSTR("SX126x:handle:IRQflag=%d\n"), irqStatus);
+
 		//Transmission done
 		if (irqStatus & RADIOLIB_SX126X_IRQ_TX_DONE) {
 			SX126x.txComplete = true;
@@ -193,10 +194,6 @@ static void SX126x_handle()
 			                bufferStatus.fields.payloadLength); // If packet length is 0, it will be retrived automatically, but MySensors needs to know the length.
 			SX126x.currentPacket.RSSI = SX126x_RSSItoInternal((int16_t)radio1.getRSSI());
 			SX126x.currentPacket.SNR = radio1.getSNR();
-			// SX126x_DEBUG(PSTR("RX_DONE,ver=%u,promiscous=%u,recipient=%u\n"),
-			//     SX126x.currentPacket.header.version,
-			//     SX126x_PROMISCUOUS,
-			//     SX126x.currentPacket.header.recipient);
 			if ((SX126x.currentPacket.header.version >= SX126x_MIN_PACKET_HEADER_VERSION) &&
 			(SX126x_PROMISCUOUS || SX126x.currentPacket.header.recipient == SX126x.address ||
 			SX126x.currentPacket.header.recipient == SX126x_BROADCAST_ADDRESS)) {
@@ -204,15 +201,9 @@ static void SX126x_handle()
 				SX126x.ackReceived = SX126x.currentPacket.header.controlFlags.fields.ackReceived &&
 				                     !SX126x.currentPacket.header.controlFlags.fields.ackRequested;
 				SX126x.dataReceived = !SX126x.ackReceived;
-				SX126x_DEBUG(PSTR("ackReceived=%d, dataRecevied=%d,recipient=%u\n"), SX126x.ackReceived,
-				             SX126x.dataReceived, SX126x.currentPacket.header.recipient);
 				// if data was received, push it to the circular buffer
 				if(SX126x.dataReceived) {
-					if (!rx_circular_buffer.pushFront(&SX126x.currentPacket)) {
-						// SX126x_DEBUG(PSTR("SX126x:HANDLE:PushFail\n"));
-					} else {
-						// SX126x_DEBUG(PSTR("SX126x:HANDLE:Push\n"));
-					}
+					rx_circular_buffer.pushFront(&SX126x.currentPacket);
 				}
 			}
 		}
@@ -221,6 +212,7 @@ static void SX126x_handle()
 		if (irqStatus & RADIOLIB_SX126X_IRQ_CAD_DONE) {
 			SX126x.channelFree = true;
 			SX126x.radioMode = SX126x_MODE_STDBY_RC;
+
 		}
 
 		//CAD channel active
@@ -243,19 +235,10 @@ static void SX126x_standBy()
 	int16_t status = radio1.standby(); // this uses 13 MHz RC oscilator by default
 	if(status) {
 		SX126x_DEBUG(PSTR("SX126x:ERR:STBY:status=%d\n"), status);
-	} else {
-		SX126x.radioMode = SX126x_MODE_STDBY_RC;
-	}
-}
+	}}
 static void SX126x_sleep(void)
 {
-	int16_t status = radio1.sleep();
-	if(status) {
-		SX126x_DEBUG(PSTR("SX126x:ERR:SLEEP:Status=%d\n"), status);
-	} else {
-		delayMicroseconds(500);
-		SX126x.radioMode = SX126x_MODE_SLEEP;
-	}
+	radio1.sleep();
 }
 
 static bool SX126x_txPower(sx126x_powerLevel_t power)
@@ -297,14 +280,13 @@ static bool SX126x_sendWithRetry(const uint8_t recipient, const void *buffer,
 	sx126x_controlFlags_t flags{ 0 };
 	flags.fields.ackRequested = !noACK;
 	SX126x.txSequenceNumber++;
-	for (uint8_t retry = 0; retry <  /* SX126x_RETRIES */ 4; retry++) {
+	for (uint8_t retry = 0; retry <  SX126x_RETRIES; retry++) {
 		SX126x_DEBUG(PSTR("SX126x:SWR:SEND,TO=%u,SEQ=%u,RETRY=%u\n"),
 		             recipient,
 		             SX126x.txSequenceNumber,
 		             retry);
 		bool sendResult = SX126x_send(recipient, (uint8_t *)buffer, bufferSize, flags);
 		if (!sendResult) {
-			SX126x_DEBUG(PSTR("!SX126x:SWR:SEND Failed in sendWithRetry\n"));
 			SX126x.radioMode = SX126x_MODE_STDBY_RC;
 			return false;
 		}
@@ -354,8 +336,6 @@ static bool SX126x_sendWithRetry(const uint8_t recipient, const void *buffer,
 static bool SX126x_send(const uint8_t recipient, uint8_t *data, const uint8_t len,
                         const sx126x_controlFlags_t flags)
 {
-	//	SX126x_DEBUG(PSTR("SX126x:EnteredSX126X_send()\n"));
-
 	sx126x_packet_t packet;
 	packet.header.version = SX126x_PACKET_HEADER_VERSION;
 	packet.header.sender = SX126x.address;
@@ -363,17 +343,11 @@ static bool SX126x_send(const uint8_t recipient, uint8_t *data, const uint8_t le
 	packet.payloadLen = min(len, (uint8_t)SX126x_MAX_PAYLOAD_LEN);
 	packet.header.controlFlags = flags;
 	memcpy((void *)&packet.payload, (void *)data, packet.payloadLen);
-#ifdef LISTENONLY
-	return true;  // TODO:  Using this for listen only gateway.  Remove when done testing.
-#else
-	return SX126x_sendPacket(
-	           &packet);  // TODO:  Comment out for listen only gateway.  Remove comment when done testing.
-#endif //LISTENONLY
+	return SX126x_sendPacket(&packet); 
 }
 
 static bool SX126x_sendPacket(sx126x_packet_t *packet)
 {
-	// SX126x_DEBUG(PSTR("SX126x:EnteredSX126X_sendPacket()\n"));
 	if (!SX126x_cad()) {
 		return false;
 	}
@@ -397,7 +371,7 @@ static bool SX126x_sendPacket(sx126x_packet_t *packet)
 		radio1.finishTransmit();  //  Switch to RX for Ack is in SendWithRetry()
 		return true;
 	} else {
-		SX126x_DEBUG(PSTR("SX126x:ERR:TX:sendPacket:status=%d\n"), transmissionState);
+		SX126x_DEBUG(PSTR("SX126x:SWR:TX ERR:status=%d\n"), transmissionState);
 		// clean up after transmission is finished
 		radio1.finishTransmit();
 		SX126x.txComplete = false;
@@ -426,12 +400,10 @@ static bool SX126x_packetAvailable()
 {
 	uint8_t packetcnt = rx_circular_buffer.available();
 	if (packetcnt > 0) {
-		SX126x_DEBUG(PSTR("packetcnt = %d\n"), packetcnt);
 		return true;
 	} else {
 		return false;
 	}
-	//	return rx_circular_buffer.available() > 0;
 }
 
 static uint8_t SX126x_getData(uint8_t *buffer, const uint8_t bufferSize)
@@ -445,8 +417,6 @@ static uint8_t SX126x_getData(uint8_t *buffer, const uint8_t bufferSize)
 	const uint8_t payloadSize = min(first_message->payloadLen, bufferSize);
 	if (buffer != NULL) {
 		(void)memcpy((void *)buffer, (void *)&first_message->payload, payloadSize);
-	} else {
-		SX126x_DEBUG(PSTR("Attempt to read from empty circular buffer\n"));
 	}
 
 	// ACK handling
@@ -456,6 +426,7 @@ static uint8_t SX126x_getData(uint8_t *buffer, const uint8_t bufferSize)
 		// delay for fast GW and slow nodes
 		delay(50);
 #endif
+		SX126x_DEBUG(PSTR("SX126x:RCV:SEND ACK\n"));
 		SX126x_sendAck(
 		    first_message->header.sender,
 		    first_message->header.sequenceNumber,
@@ -463,17 +434,10 @@ static uint8_t SX126x_getData(uint8_t *buffer, const uint8_t bufferSize)
 		    first_message->SNR);
 	}
 	// release buffer
-	if (rx_circular_buffer.available() > 1) {
-		if (!rx_circular_buffer.popBack()) {
-			SX126x_DEBUG(PSTR("SX126x:PAVAIL:PopBackFail\n"));
-		}
-	} else { // TODO:  We should just be able to popBack.  Simplify and remove clear
-		rx_circular_buffer.clear();
-
-	}
+	rx_circular_buffer.popBack();
 
 	radio1.startReceive();  // Got the data, so we switch to receive
-
+	SX126x.radioMode = SX126x_MODE_RX;
 	return payloadSize;
 }
 
@@ -505,7 +469,7 @@ static void SX126x_ATC()
 	newPowerLevel = SX126x.powerLevel + delta / 2;
 	// newPowerLevel = constrain(newPowerLevel, MY_SX126x_MIN_POWER_LEVEL_DBM, // This constraint is in SX126x_txPower()
 	//                           MY_SX126x_MAX_POWER_LEVEL_DBM);
-	SX126x_DEBUG(PSTR("SX126x:ATC:cR=%d, tR=%d, rTXL=%d\n"),
+	SX126x_DEBUG(PSTR("SX126x:ATC:ADJ TXL, cR=%d, tR=%d, rTXL=%d\n"),
 	             SX126x_internalToRSSI(SX126x.currentPacket.ACK.RSSI),
 	             SX126x.targetRSSI,
 	             newPowerLevel
@@ -594,7 +558,7 @@ static bool SX126x_setTxPowerPercent(const uint8_t newPowerPercent)
 	const sx126x_powerLevel_t newPowerLevel = static_cast<sx126x_powerLevel_t>
 	    (MY_SX126x_MIN_POWER_LEVEL_DBM + (MY_SX126x_MAX_POWER_LEVEL_DBM
 	                                      - MY_SX126x_MIN_POWER_LEVEL_DBM) * (newPowerPercent / 100.0f));
-	SX126x_DEBUG(PSTR("SX126x:SPP:PCT=%u,TX LEVEL=%n\n"), newPowerPercent, newPowerLevel);
+	SX126x_DEBUG(PSTR("SX126x:SPP:PCT=%u,TX LEVEL=%d\n"), newPowerPercent, newPowerLevel);
 	return SX126x_txPower(newPowerLevel);
 }
 
@@ -629,13 +593,12 @@ static void SX126x_handleError(int16_t statusCode)
 		break;
 
 	case RADIOLIB_ERR_INVALID_OUTPUT_POWER:
-		SX126x_DEBUG(PSTR("!SX126x:ATC:ERR:Power invalid for this module\n"));
+		SX126x_DEBUG(PSTR("SX126x:ATC:ERR:Power constrained to level valid for this module\n"));
 		break;
 
 	default:
-		// do nothing
+		// Just print the RadioLib error number
 		SX126x_DEBUG(PSTR("!SX126x:INIT:ERR:status=%d\n"), statusCode);
-
 		break;
 	}
 

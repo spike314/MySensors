@@ -46,14 +46,14 @@
 * |!| SX126x | INIT | SANCHK FAIL                            | Sanity check failed, check wiring or replace module
 * |!| SX126x | INIT | ERR:0x%%X%%X                           | An error occured during init. See GetDeviceErrors in datasheet
 * | | SX126x | RCV  | SEND ACK                               | ACK request received, sending ACK back
-* | | SX126x | PTC  | LEVEL=%%d                              | Set TX power level
+* | | SX126x | PWR  | LEVEL=%%d                              | Set TX power level
 * | | SX126x | SAC  | SEND ACK,TO=%%d,RSSI=%%d,SNR=%%d       | Send ACK to node (TO), RSSI of received message (RSSI), SNR of message (SNR)
 * | | SX126x | ATC  | ADJ TXL,cR=%%d,tR=%%d..%%d,rTXL=%%d    | Adjust TX level, current RSSI (cR), target RSSI range (tR), requested TX level (rTXL)
-* | | SX126x | SWR  | SEND,TO=%%d,RETRY=%%d                  | Send message to (TO), NACK retry counter (RETRY)
-* | | SX126x | SWR  | ACK FROM=%%d,SEQ=%%d,RSSI=%%d,SNR=%%d  | ACK received from node (FROM), seq ID (SEQ), (RSSI), (SNR)
+* | | SX126x | SWR  | SEND,TO=%%d,SEQ=%%u,RETRY=%%d          | Send message to (TO), seq ID (SEQ), NACK retry counter (RETRY)
+* | | SX126x | SWR  | ACK FROM=%%u,SEQ=%%d,RSSI=%%d,SNR=%%d  | ACK received from node (FROM), seq ID (SEQ), (RSSI), (SNR)
 * |!| SX126x | SWR  | NACK                                   | No ACK received
 * |!| SX126x | CAD  |                                        | Could not send, channel active
-* | | SX126x | SPP  | PCT=%%d,TX LEVEL=%%d                   | Set TX level percent (PCT), TX level (LEVEL)
+* | | SX126x | SPP  | PCT=%%u,TX LEVEL=%%d                   | Set TX level percent (PCT), TX level (LEVEL)
 * | | SX126x | PWD  |                                        | Power down radio
 * | | SX126x | PWU  |                                        | Power up radio
 *
@@ -170,7 +170,7 @@
 #define SX126x_868MHZ (868.10) //!< 868.1 Mhz
 #define SX126x_915MHZ (915.00) //!< 915 Mhz
 
-#define SX126x_RETRIES (5u)				   //!< Retries in case of failed transmission
+#define SX126x_RETRIES (2u)				   //!< Retries in case of failed transmission
 #define SX126x_MAX_PACKET_LEN (0x40u)	   //!< This is the maximum number of bytes that can be carried by the LORA
 #define SX126x_PREAMBLE_LENGTH (8u)		   //!< Preamble length, default=8
 #define SX126x_CAD_TIMEOUT_MS (2 * 1000ul) //!< channel activity detection timeout
@@ -385,7 +385,6 @@ static const Module::RfSwitchMode_t rfswitch_table[] = {
 	{STM32WLx::MODE_TX_HP, {LOW,  HIGH}},
 	END_OF_MODE_TABLE,
 };
-#define MY_SX126x_TCXO_VOLTAGE (1.7)  //This is the TCXO voltage for E5 module
 #elif (MY_SX126x_VARIANT == 2)
 SX1262 radio1 = new Module(MY_SX126x_CS_PIN, MY_SX126x_IRQ_PIN, MY_SX126x_RESET_PIN,
                            MY_SX126x_BUSY_PIN);
