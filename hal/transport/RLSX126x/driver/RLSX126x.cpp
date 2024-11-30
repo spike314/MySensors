@@ -60,8 +60,8 @@ static bool SX126x_initialise()
 {
 	// setting pin modes
 	SX126x_DEBUG(PSTR("SX126x:INIT\n"));
-#ifdef STM32WLxx // No pins available on STM32WL series
-	SX126x_DEBUG(PSTR("SX126x:INIT:STM32WLxx defined. Pin assignment doesn't matter.\n"),
+#ifdef STM32WLxx // Radio connections are internal (no pins) on STM32WL series
+	SX126x_DEBUG(PSTR("SX126x:INIT:STM32WLxx defined. Pin assignment not applicable.\n"),
 	             MY_SX126x_BUSY_PIN);
 #endif
 
@@ -129,13 +129,7 @@ static bool SX126x_initialise()
 #if !defined(MY_SX126x_USE_DIO2_ANT_SWITCH) && !defined(MY_SX126x_ANT_SWITCH_PIN)
 #error Either MY_SX126x_USE_DIO2_ANT_SWITCH or MY_SX126x_ANT_SWITCH_PIN has to be defined
 #endif
-#if defined(MY_SX126x_USE_DIO2_ANT_SWITCH)
-	radio1.setDio2AsRfSwitch();
-	SX126x_DEBUG(PSTR("SX126x:INIT:DIO2AntSw\n"));
-#endif
 #ifdef MY_SX126x_ANT_SWITCH_PIN // Switch Pin High = Transmit (this seems to be the norm for DIO2)
-	//	hwPinMode(MY_SX126x_ANT_SWITCH_PIN, OUTPUT);
-	//	hwDigitalWrite(MY_SX126x_ANT_SWITCH_PIN, LOW);
 	radio1.setRfSwitchPins(RADIOLIB_NC,
 	                       MY_SX126x_ANT_SWITCH_PIN); // RX enable not connected, TX enable high on transmit.
 	SX126x_DEBUG(PSTR("SX126x:INIT:ASWPIN=%u\n"), MY_SX126x_ANT_SWITCH_PIN);
@@ -153,6 +147,10 @@ static bool SX126x_initialise()
 		SX126x_handleError( status); // Sends sanity check messages without calling sanitycheck()
 		return false;
 	}
+#if defined(MY_SX126x_USE_DIO2_ANT_SWITCH)
+	radio1.setDio2AsRfSwitch();
+	SX126x_DEBUG(PSTR("SX126x:INIT:DIO2AntSw\n"));
+#endif
 
 
 	// disable and clear all interrupts
@@ -235,7 +233,9 @@ static void SX126x_standBy()
 	int16_t status = radio1.standby(); // this uses 13 MHz RC oscilator by default
 	if(status) {
 		SX126x_DEBUG(PSTR("SX126x:ERR:STBY:status=%d\n"), status);
-	}}
+	}
+}
+
 static void SX126x_sleep(void)
 {
 	radio1.sleep();
@@ -255,13 +255,20 @@ static bool SX126x_txPower(sx126x_powerLevel_t power)
 
 static bool SX126x_sanityCheck()
 {
-	int16_t status = radio1.standby(); // set to standby and check if there are errors
+
+#ifdef STM32WLxx
+	return true;   // No errors since the radio wiring is internal to the chip
+#else
+	int16_t status = radio1.standby(); // For non-STM32LS set to standby and check if there are errors
+	// TODO:   This isn't a very good sanity check except at init.  Find a method that doesn't require standby.
 	if(status) {
 		SX126x_handleError(status);
 		return false;
 	} else {
+		SX126x_rx();
 		return true;
 	}
+#endif
 }
 
 static void SX126x_setAddress(uint8_t address)
@@ -290,8 +297,7 @@ static bool SX126x_sendWithRetry(const uint8_t recipient, const void *buffer,
 			SX126x.radioMode = SX126x_MODE_STDBY_RC;
 			return false;
 		}
-		radio1.startReceive();  // Send was successful, so we switch to receive
-		SX126x.radioMode = SX126x_MODE_RX;
+		SX126x_rx();
 		if (noACK) {
 			return true;
 		}
@@ -299,9 +305,7 @@ static bool SX126x_sendWithRetry(const uint8_t recipient, const void *buffer,
 		while (hwMillis() < start + SX126x_RETRY_TIMEOUT_MS) {
 			SX126x_handle();
 			if (SX126x.ackReceived) {
-				SX126x.ackReceived = false;
-				radio1.startReceive();  // Send was successful, so we switch to receive
-				SX126x.radioMode = SX126x_MODE_RX;
+				SX126x_rx();  // Send was successful so go back to receive
 				//is it the ACK for our current packet?
 				if (SX126x.currentPacket.header.sender == recipient &&
 				SX126x.currentPacket.ACK.sequenceNumber == SX126x.txSequenceNumber) {
@@ -379,6 +383,14 @@ static bool SX126x_sendPacket(sx126x_packet_t *packet)
 	}
 }
 
+static void SX126x_rx()
+{
+		SX126x.ackReceived = false;
+		SX126x.dataReceived = false;
+		radio1.startReceive(); 
+		SX126x.radioMode = SX126x_MODE_RX;
+}
+
 static bool SX126x_cad()
 {
 	SX126x.channelActive = false;
@@ -435,9 +447,8 @@ static uint8_t SX126x_getData(uint8_t *buffer, const uint8_t bufferSize)
 	}
 	// release buffer
 	rx_circular_buffer.popBack();
-
-	radio1.startReceive();  // Got the data, so we switch to receive
-	SX126x.radioMode = SX126x_MODE_RX;
+	// Go back to receive 
+	SX126x_rx(); 
 	return payloadSize;
 }
 

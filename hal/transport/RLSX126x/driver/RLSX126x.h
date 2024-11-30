@@ -468,6 +468,11 @@ static bool SX126x_send(const uint8_t recipient, uint8_t *data, const uint8_t le
 */
 static bool SX126x_sendPacket(sx126x_packet_t *packet);
 
+/**
+ * @brief Puts SX126x into receiving mode
+ */
+static void SX126x_rx();
+
 
 /**
  * @brief Scans channel for activity
