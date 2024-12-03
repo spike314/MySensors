@@ -177,6 +177,7 @@ static void SX126x_handle()
 		uint32_t irqStatus = RADIOLIB_SX126X_IRQ_NONE;
 		//get the interrupt fired
 		irqStatus = radio1.getIrqFlags();
+		SX126x_DEBUG(PSTR("SX126x:IRQ=%d\n"), irqStatus );
 
 		//Transmission done
 		if (irqStatus & RADIOLIB_SX126X_IRQ_TX_DONE) {
@@ -189,9 +190,9 @@ static void SX126x_handle()
 			bufferStatus.fields.payloadLength = min(radio1.getPacketLength(true), SX126x_MAX_PACKET_LEN);
 			SX126x.currentPacket.payloadLen = bufferStatus.fields.payloadLength - SX126x_HEADER_LEN;
 			radio1.readData(SX126x.currentPacket.data,
-			                bufferStatus.fields.payloadLength); // If packet length is 0, it will be retrived automatically, but MySensors needs to know the length.
-			SX126x.currentPacket.RSSI = SX126x_RSSItoInternal((int16_t)radio1.getRSSI());
-			SX126x.currentPacket.SNR = radio1.getSNR();
+			                bufferStatus.fields.payloadLength); // If packet length is 0, it will be retrieved automatically, but MySensors needs to know the length.
+			SX126x_DEBUG(PSTR("SX126x:RX:version=%d, receipient=%d, ackRX=%d, ackRQ=%d\n"), SX126x.currentPacket.header.version, SX126x.currentPacket.header.recipient, SX126x.currentPacket.header.controlFlags.fields.ackReceived,  SX126x.currentPacket.header.controlFlags.fields.ackRequested);
+						
 			if ((SX126x.currentPacket.header.version >= SX126x_MIN_PACKET_HEADER_VERSION) &&
 			(SX126x_PROMISCUOUS || SX126x.currentPacket.header.recipient == SX126x.address ||
 			SX126x.currentPacket.header.recipient == SX126x_BROADCAST_ADDRESS)) {
@@ -201,6 +202,8 @@ static void SX126x_handle()
 				SX126x.dataReceived = !SX126x.ackReceived;
 				// if data was received, push it to the circular buffer
 				if(SX126x.dataReceived) {
+					SX126x.currentPacket.RSSI = SX126x_RSSItoInternal((int16_t)radio1.getRSSI());
+					SX126x.currentPacket.SNR = radio1.getSNR();
 					rx_circular_buffer.pushFront(&SX126x.currentPacket);
 				}
 			}
@@ -210,7 +213,6 @@ static void SX126x_handle()
 		if (irqStatus & RADIOLIB_SX126X_IRQ_CAD_DONE) {
 			SX126x.channelFree = true;
 			SX126x.radioMode = SX126x_MODE_STDBY_RC;
-
 		}
 
 		//CAD channel active
@@ -288,10 +290,11 @@ static bool SX126x_sendWithRetry(const uint8_t recipient, const void *buffer,
 	flags.fields.ackRequested = !noACK;
 	SX126x.txSequenceNumber++;
 	for (uint8_t retry = 0; retry <  SX126x_RETRIES; retry++) {
-		SX126x_DEBUG(PSTR("SX126x:SWR:SEND,TO=%u,SEQ=%u,RETRY=%u\n"),
+		SX126x_DEBUG(PSTR("SX126x:SWR:SEND,TO=%u,SEQ=%u,RETRY=%u,noACK=%u\n"),
 		             recipient,
 		             SX126x.txSequenceNumber,
-		             retry);
+		             retry,
+					 noACK);
 		bool sendResult = SX126x_send(recipient, (uint8_t *)buffer, bufferSize, flags);
 		if (!sendResult) {
 			SX126x.radioMode = SX126x_MODE_STDBY_RC;
@@ -302,7 +305,7 @@ static bool SX126x_sendWithRetry(const uint8_t recipient, const void *buffer,
 			return true;
 		}
 		uint32_t start = hwMillis(); // We need to wait for an ack
-		while (hwMillis() < start + SX126x_RETRY_TIMEOUT_MS) {
+		while (hwMillis() < (start + SX126x_RETRY_TIMEOUT_MS)) {
 			SX126x_handle();
 			if (SX126x.ackReceived) {
 				SX126x_rx();  // Send was successful so go back to receive
@@ -320,6 +323,10 @@ static bool SX126x_sendWithRetry(const uint8_t recipient, const void *buffer,
 					// Ack received.
 					return true;
 				}
+				SX126x_DEBUG(PSTR("SX126x:SWR:ACK not current FROM=%u,SEQ=%u\n"),
+				    SX126x.currentPacket.header.sender,
+				    SX126x.currentPacket.ACK.sequenceNumber);
+
 			}
 			doYield();
 		}
@@ -387,8 +394,12 @@ static void SX126x_rx()
 {
 		SX126x.ackReceived = false;
 		SX126x.dataReceived = false;
-		radio1.startReceive(); 
+		int16_t status = radio1.startReceive(); 
 		SX126x.radioMode = SX126x_MODE_RX;
+		if(status) { // there was an error
+			SX126x_handleError( status);
+		}
+		// TODO:  checking stats for debugging RA01sh.  Remove when done
 }
 
 static bool SX126x_cad()
