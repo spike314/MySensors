@@ -30,6 +30,7 @@
 #include <SPI.h>
 #include <EEPROM.h>
 #include "STM32LowPower.h"
+#include "stm32yyxx_ll_adc.h"
 
 #ifdef __cplusplus
 #include <Arduino.h>
@@ -119,7 +120,7 @@ void hwWriteConfigBlock(void *buf, void *addr, size_t length);
 void hwWriteConfig(const int addr, uint8_t value);
 uint8_t hwReadConfig(const int addr);
 
-
+#define ADC_RANGE 4096
 
 // SOFTSPI
 #ifdef MY_SOFTSPI

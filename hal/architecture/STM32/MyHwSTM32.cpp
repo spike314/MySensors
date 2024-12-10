@@ -24,6 +24,7 @@
 
 #include "MyHwSTM32.h"
 
+
 /*
 * Pinout STM32F103C8 dev board:
 * http://wiki.stm32duino.com/images/a/ae/Bluepillpinout.gif
@@ -191,10 +192,46 @@ bool hwUniqueID(unique_id_t *uniqueID)
 	return true;
 }
 
+void disableIcache (void)
+{
+  #if defined(ICACHE) && defined (HAL_ICACHE_MODULE_ENABLED) && !defined(HAL_ICACHE_MODULE_DISABLED)
+  bool icache_enabled = false;
+  if (HAL_ICACHE_IsEnabled() == 1) {
+    icache_enabled = true;
+    /* Disable instruction cache prior to internal cacheable memory update */
+    if (HAL_ICACHE_Disable() != HAL_OK) {
+      Error_Handler();
+    }
+  }
+#endif
+}
+
+void enableIcache(void)
+{
+  #if defined(ICACHE) && defined (HAL_ICACHE_MODULE_ENABLED) && !defined(HAL_ICACHE_MODULE_DISABLED)
+  if (icache_enabled)
+  {
+    /* Re-enable instruction cache */
+    if (HAL_ICACHE_Enable() != HAL_OK) {
+      Error_Handler();
+    }
+  }
+#endif
+}
+
 uint16_t hwCPUVoltage(void)
 {
-	//Not yet implemented
-	return FUNCTION_NOT_SUPPORTED;
+  analogReadResolution(12);
+	disableIcache();
+  int32_t avrefAnalog = analogRead(AVREF);
+  int32_t VRef;
+#ifdef ADC2_BASE  // Processor has more than one ADC
+  VRef =  __LL_ADC_CALC_VREFANALOG_VOLTAGE(ADC1, avrefAnalog, LL_ADC_RESOLUTION_12B);
+#else
+  VRef =  __LL_ADC_CALC_VREFANALOG_VOLTAGE(avrefAnalog, LL_ADC_RESOLUTION_12B);
+#endif
+  enableIcache();
+  return (uint16_t) VRef;
 }
 
 uint16_t hwCPUFrequency(void)
@@ -204,7 +241,16 @@ uint16_t hwCPUFrequency(void)
 
 int8_t hwCPUTemperature(void)
 {
-	return FUNCTION_NOT_SUPPORTED;
+  int32_t VRef = hwCPUVoltage();
+  int32_t temperature;
+  disableIcache();
+#ifdef ADC2_BASE  // Processor has more than one ADC
+  temperature = __LL_ADC_CALC_TEMPERATURE(ADC1, VRef, analogRead(ATEMP), LL_ADC_RESOLUTION_12B);
+#else
+  temperature = __LL_ADC_CALC_TEMPERATURE(VRef, analogRead(ATEMP), LL_ADC_RESOLUTION_12B);
+#endif
+enableIcache();
+return (int8_t) temperature;
 }
 
 uint16_t hwFreeMem(void)
@@ -225,3 +271,4 @@ void hwReboot(void)
 	while (true)
 		;
 }
+
