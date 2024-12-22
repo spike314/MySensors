@@ -379,6 +379,7 @@ STM32WLx radio1 = new STM32WLx_Module();
 
 // Set RF switch configuration for Seeed E5 module
 // E5 is always High Power Transmit. Antenna setting PA4 1; PA5 0 = receive. PA4 0; PA5 1 = transmit.
+// TODO:  Update for E5-LE MODE_TX_LP when I get one to test
 static const uint32_t rfswitch_pins[] = {PA4,  PA5, RADIOLIB_NC, RADIOLIB_NC, RADIOLIB_NC};
 static const Module::RfSwitchMode_t rfswitch_table[] = {
 	{STM32WLx::MODE_RX,    {HIGH, LOW}},
@@ -562,6 +563,21 @@ static bool SX126x_setTxPowerPercent(const uint8_t newPowerPercent);
  * @param statusCode code returned by RadioLib function
  */
 static void SX126x_handleError(int16_t statusCode);
+
+
+/**
+ * @brief Optmize PA for STM32WL power levels
+ * @param newPower TX power level in dB (previously clipped for module limits)
+ */
+#ifdef STM32WLxx
+void SX126x_optimizePA(int8_t newPower);
+#endif
+
+/**
+ * @brief Set the transmit power of the radio
+ * @param power TX power level in dB
+ */
+static bool SX126x_txPower(sx126x_powerLevel_t power);
 
 
 /** @}*/

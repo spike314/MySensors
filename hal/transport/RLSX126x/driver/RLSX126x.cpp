@@ -61,8 +61,7 @@ static bool SX126x_initialise()
 	// setting pin modes
 	SX126x_DEBUG(PSTR("SX126x:INIT\n"));
 #ifdef STM32WLxx // Radio connections are internal (no pins) on STM32WL series
-	SX126x_DEBUG(PSTR("SX126x:INIT:STM32WLxx defined. Pin assignment not applicable.\n"),
-	             MY_SX126x_BUSY_PIN);
+	SX126x_DEBUG(PSTR("SX126x:INIT:STM32WLxx defined. Pin assignment not applicable.\n"));
 #endif
 
 #if defined(MY_SX126x_POWER_PIN)
@@ -139,7 +138,7 @@ static bool SX126x_initialise()
 
 	// start radio
 	int16_t status = radio1.begin(MY_SX126x_FREQUENCY, MY_SX126x_LORA_BW, MY_SX126x_LORA_SF,
-	                              MY_SX126x_LORA_CR, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, MY_SX126x_TX_POWER_DBM, 8,
+	                              MY_SX126x_LORA_CR, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, SX126x.powerLevel , 8,
 	                              MY_SX126x_TCXO_VOLTAGE, false);
 	// 8 is the preamble length
 	// false sets it to use DC/DC regulator
@@ -152,6 +151,8 @@ static bool SX126x_initialise()
 	SX126x_DEBUG(PSTR("SX126x:INIT:DIO2AntSw\n"));
 #endif
 
+	// Set desired power level
+	SX126x_txPower(MY_SX126x_TX_POWER_DBM );
 
 	// disable and clear all interrupts
 	radio1.clearIrqFlags(RADIOLIB_SX126X_IRQ_ALL);
@@ -250,6 +251,10 @@ static bool SX126x_txPower(sx126x_powerLevel_t power)
 	int8_t clippedPower;
 	radio1.checkOutputPower(power, &clippedPower); // Let RadioLib constrain to radio variant capability
 	radio1.setOutputPower(clippedPower);
+#ifdef STM32WLxx
+	SX126x_optimizePA(clippedPower);  // optimize PA for powerlevel
+#endif
+
 	SX126x.powerLevel = clippedPower;
 	SX126x_DEBUG(PSTR("SX126x:PWR:LEVEL=%d db\n"), SX126x.powerLevel);
 	return true;
@@ -625,3 +630,56 @@ static void SX126x_handleError(int16_t statusCode)
 	}
 
 }
+
+#ifdef STM32WLxx
+void SX126x_optimizePA(int8_t newPower)
+{
+	// See https://forum.rakwireless.com/t/rak3172-too-much-consumption-in-transmit-eu868/4781/8
+	// Also see ST Application Note AN5457 "RF matching network design guide for STM32WL Series"
+
+	/*  Relevant RadioLib expressions
+	Ratdiolib::setPaConfig   ( paDutyCycle  , deviceSel  , hpMax = RADIOLIB_SX126X_PA_CONFIG_HP_MAX, paLut = RADIOLIB_SX126X_PA_CONFIG_PA_LUT  )
+	#define RADIOLIB_SX126X_PA_CONFIG_SX1262                        0x00
+	#define RADIOLIB_SX126X_PA_CONFIG_SX1261                        0x01
+	#define RADIOLIB_SX126X_PA_CONFIG_SX1268                        0x00
+	//RADIOLIB_SX126X_CMD_SET_PA_CONFIG
+	#define RADIOLIB_SX126X_PA_CONFIG_HP_MAX                        0x07
+	#define RADIOLIB_SX126X_PA_CONFIG_PA_LUT                        0x01
+	#define RADIOLIB_SX126X_PA_CONFIG_SX1262_8                      0x00
+	For deviceSel, Radiolib uses 0x00 for hp supported and 0x01 for LP supported
+	*/
+    // newPower needs to be clipped to appropriate settings prior to calling this function
+	// Wio E5 only supports hp.  Wio E5-LE only supporst lp
+  //Module* mod = radio1.getMod();  // TODO:  This is a protected function.  Update when we have a LE version to test.  See  STM32WL switchmode section.
+  //bool lp_supported = mod->findRfSwitchMode(MODE_TX_LP);
+
+
+    if (/*lp_supported */ false) {  // TODO:  Update when we have a E5-LE to test
+        if (newPower > 10) {
+			// Use default settings for 14dB (0x04, 0x01, 0x00, 0x01)
+			SX126x_DEBUG(PSTR("SX126x:PWR:LP:LEVEL=%d db\n"), newPower);
+            return;
+        } else {
+            radio1.setPaConfig(0x01, 0x01, 0x00, 0x01); // 10 dB
+			SX126x_DEBUG(PSTR("SX126x:PWR:LP:LEVEL=%d db\n"), newPower);
+        }
+    } else { // Using HP
+            if (newPower > 20) {
+				SX126x_DEBUG(PSTR("SX126x:PWR:HP:LEVEL=%d db\n"), newPower);
+                // Use RadioLib default for 22dB (0x04, 0x00, 0x07, 0x01)
+                return;
+            } else if (newPower > 17) {
+                radio1.setPaConfig(0x03, 0x00, 0x05, 0x01); //20 dB
+				SX126x_DEBUG(PSTR("SX126x:PWR:HP:LEVEL=%d db\n"), newPower);
+            } else if (newPower > 14) {
+                radio1.setPaConfig(0x02, 0x00, 0x03, 0x01);  // 17 dB
+				SX126x_DEBUG(PSTR("SX126x:PWR:HP:LEVEL=%d db\n"), newPower);
+            } else {
+                radio1.setPaConfig(0x02, 0x00, 0x02, 0x01);  //14 dB
+				SX126x_DEBUG(PSTR("SX126x:PWR:HP:LEVEL=%d db\n"), newPower);
+            }
+	}
+	return;
+}
+#endif
+
