@@ -20,6 +20,9 @@
  *
  * SX126x driver for MySensors, Copyright (C) 2020 Eduard Iten <eduard@iten.pro>
  *
+ * SX126x driver for MySensors incorporating RadioLib low-level radio communications, https://github.com/jgromes/RadioLib
+ * Based in Edward Iten SX126x driver.
+ * Copyright (C) 2024 Carl Nagel <carln@hoootch-99.com>
  */
 
 #include "RLSX126x.h"
@@ -37,7 +40,7 @@ static sx126x_internal_t SX126x;
 
 // RX Buffer
 static sx126x_packet_t rx_circular_buffer_buffer[MY_SX126X_RX_BUFFER_SIZE];
-// use current packet as Pointer to rx circular buffer
+// use SX126x.currentPacket as Pointer to rx circular buffer
 // Circular buffer
 static CircularBuffer<sx126x_packet_t> rx_circular_buffer(rx_circular_buffer_buffer,
         MY_SX126X_RX_BUFFER_SIZE);
@@ -108,20 +111,16 @@ static bool SX126x_initialise()
 #define MY_SX126x_TCXO_VOLTAGE 0.0 // RadioLib uses 0.0 if not using TCXO
 #endif // MY_SX126x_USE_TCXO
 
-
-
 	// Antenna RX/TX switch logic and TXCO for STM32WL
+	// TODO:  This is really specific to the Wio-E5.  Generalize and 
+	// Make it so it isn't a redefinition
 #if defined(STM32WLxx)
 	// For STM32WL
 	// set RF switch control configuration
 	// this has to be done prior to calling begin()
 #define MY_SX126x_TCXO_VOLTAGE (1.7)  //This is the TCXO voltage for E5 module
-
 	radio1.setRfSwitchTable(rfswitch_pins, rfswitch_table);
 #else
-
-
-
 #if defined(MY_SX126x_USE_DIO2_ANT_SWITCH) && defined(MY_SX126x_ANT_SWITCH_PIN)
 #error MY_SX126x_USE_DIO2_ANT_SWITCH and MY_SX126x_ANT_SWITCH_PIN both defined which makes no sense
 #endif
@@ -134,7 +133,6 @@ static bool SX126x_initialise()
 	SX126x_DEBUG(PSTR("SX126x:INIT:ASWPIN=%u\n"), MY_SX126x_ANT_SWITCH_PIN);
 #endif
 #endif // else
-
 
 	// start radio
 	int16_t status = radio1.begin(MY_SX126x_FREQUENCY, MY_SX126x_LORA_BW, MY_SX126x_LORA_SF,
@@ -172,7 +170,7 @@ static void SX126x_interruptHandler()
 
 static void SX126x_handle()
 {
-#ifdef MY_SX126x_IRQ_PIN 
+#ifdef MY_SX126x_IRQ_PIN   // TODO:  With STM32WL, this is required, even though there is no IRQ Pin
 	if (SX126x.irqFired) {
 #endif
 		uint32_t irqStatus = RADIOLIB_SX126X_IRQ_NONE;
@@ -191,7 +189,7 @@ static void SX126x_handle()
 			bufferStatus.fields.payloadLength = min(radio1.getPacketLength(true), SX126x_MAX_PACKET_LEN);
 			SX126x.currentPacket.payloadLen = bufferStatus.fields.payloadLength - SX126x_HEADER_LEN;
 			radio1.readData(SX126x.currentPacket.data,
-			                bufferStatus.fields.payloadLength); // If packet length is 0, it will be retrieved automatically, but MySensors needs to know the length.
+			                bufferStatus.fields.payloadLength);
 			SX126x_DEBUG(PSTR("SX126x:RX:version=%d, receipient=%d, ackRX=%d, ackRQ=%d\n"), SX126x.currentPacket.header.version, SX126x.currentPacket.header.recipient, SX126x.currentPacket.header.controlFlags.fields.ackReceived,  SX126x.currentPacket.header.controlFlags.fields.ackRequested);
 						
 			if ((SX126x.currentPacket.header.version >= SX126x_MIN_PACKET_HEADER_VERSION) &&
@@ -266,7 +264,7 @@ static bool SX126x_sanityCheck()
 #ifdef STM32WLxx
 	return true;   // No errors since the radio wiring is internal to the chip
 #else
-	int16_t status = radio1.standby(); // For non-STM32LS set to standby and check if there are errors
+	int16_t status = radio1.standby(); // For non-STM32WL set to standby and check if there are errors
 	// TODO:   This isn't a very good sanity check except at init.  Find a method that doesn't require standby.
 	if(status) {
 		SX126x_handleError(status);
@@ -337,7 +335,7 @@ static bool SX126x_sendWithRetry(const uint8_t recipient, const void *buffer,
 		}
 		SX126x_DEBUG(PSTR("!SX126x:SWR:NACK\n"));  // we didn't receive an ack to our current packet
 		const uint32_t enterCSMAMS =
-		    hwMillis();   // SMVMVS = Carrier Sense Multiple Access, essentially wait for a clear channel.
+		    hwMillis();   // CSMAMS = Carrier Sense Multiple Access (wait for a clear channel)
 		const uint16_t randDelayCSMA = start % 100;
 		while (hwMillis() - enterCSMAMS < randDelayCSMA) {
 			doYield();
@@ -404,7 +402,7 @@ static void SX126x_rx()
 		if(status) { // there was an error
 			SX126x_handleError( status);
 		}
-		// TODO:  checking stats for debugging RA01sh.  Remove when done
+		// TODO:  checking status for debugging RA01sh.  Remove when done
 }
 
 static bool SX126x_cad()
@@ -489,7 +487,6 @@ static void SX126x_sendAck(const uint8_t recipient, const sx126x_sequenceNumber_
 static void SX126x_ATC()
 {
 #if !defined(MY_GATEWAY_FEATURE) && !defined(MY_SX126x_DISABLE_ATC)  // Save a little memory
-
 	int8_t delta;
 	sx126x_powerLevel_t newPowerLevel;
 	delta = SX126x.targetRSSI - SX126x_internalToRSSI(SX126x.currentPacket.ACK.RSSI);
@@ -512,7 +509,6 @@ static void SX126x_setATC(bool onOff, int8_t targetRSSI)
 	SX126x.ATCenabled = onOff;
 	SX126x.targetRSSI = targetRSSI;
 }
-
 
 void SX126x_powerUp()
 {
@@ -555,15 +551,13 @@ static int16_t SX126x_getSendingSNR(void)
 static int16_t SX126x_getReceivingRSSI(void)
 {
 	// RSSI from last received packet
-	return static_cast<int16_t>(radio1.getRSSI(
-	                                true)); // true = last read packet RSSI, false = current packet (I think).  getRSSI returns float
+	return static_cast<int16_t>(radio1.getRSSI(true));
 }
 
 static int16_t SX126x_getReceivingSNR(void)
 {
 	// SNR from last received packet
-	return static_cast<int16_t>
-	       (radio1.getSNR()); // SNR of last received packet.  No options.  getSNR retruns float
+	return static_cast<int16_t> (radio1.getSNR());
 }
 
 static int8_t SX126x_getTxPowerLevel(void)

@@ -19,7 +19,11 @@
  * Based on Olivier Mauti's RFM95 driver and Semtecs reference driver for the SX126x
  *
  * SX126x driver for MySensors, Copyright (C) 2020 Eduard Iten <eduard@iten.pro>
- *
+ * 
+ * SX126x driver for MySensors incorporating RadioLib low-level radio communications, https://github.com/jgromes/RadioLib
+ * Based in Edward Iten SX126x driver.
+ * Copyright (C) 2024 Carl Nagel <carln@hoootch-99.com>
+ * 
  */
 
 /**
@@ -163,7 +167,7 @@
 #define MY_SX126x_TX_POWER_DBM (13u)	// 20mW
 #endif
 
-// Frequency definitions  : updated for RadioLib which needs a float
+// Frequency definitions : updated for RadioLib which needs a float
 #define SX126x_169MHZ (169.00) //!< 169 Mhz
 #define SX126x_315MHZ (315.00) //!< 315 Mhz
 #define SX126x_434MHZ (433.92) //!< 433.92 Mhz
@@ -563,7 +567,6 @@ static bool SX126x_setTxPowerPercent(const uint8_t newPowerPercent);
  * @param statusCode code returned by RadioLib function
  */
 static void SX126x_handleError(int16_t statusCode);
-
 
 /**
  * @brief Optmize PA for STM32WL power levels
