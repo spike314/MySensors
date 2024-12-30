@@ -16,6 +16,8 @@
  * Copyright (C) 2022 Alexander KooLru
  * STM32 sleep mode and EEPROM support added by WhiskyDelta <arne.schwarz@d2a.de>
  * Copyright (C) 2022 Arne Schwarz
+ * STM32 CPU Voltage and CPU temperature support added by Carl Nagel <carln@hootch-99.com>
+ * Copyright (C) 2024 Carl Nagel
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License

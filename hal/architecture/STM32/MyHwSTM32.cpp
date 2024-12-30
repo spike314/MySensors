@@ -16,6 +16,8 @@
  * Copyright (C) 2022 Alexander KooLru
  * STM32 sleep mode and EEPROM support added by WhiskyDelta <arne.schwarz@d2a.de>
  * Copyright (C) 2022 Arne Schwarz
+ * STM32 CPU Voltage and CPU temperature support added by Carl Nagel <carln@hootch-99.com>
+ * Copyright (C) 2024 Carl Nagel
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -222,7 +224,7 @@ void enableIcache(void)
 uint16_t hwCPUVoltage(void)
 {
   analogReadResolution(12);
-	disableIcache();
+  disableIcache();
   int32_t avrefAnalog = analogRead(AVREF);
   int32_t VRef;
 #ifdef ADC2_BASE  // Processor has more than one ADC
@@ -268,7 +270,6 @@ void hwWatchdogReset(void)
 void hwReboot(void)
 {
 	NVIC_SystemReset();
-	while (true)
-		;
+	while (true);
 }
 
