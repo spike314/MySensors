@@ -1,3 +1,10 @@
+This fork of the MySensors Library adds support for STM32WL series to the development branch
+- Includes Mysensors STM32 archictecture hal for STM32 cube support
+- Adds RLSX126X to the transport hal, which uses the RadioLib library for low level programming to support the STM32WL series
+- Adds CPU voltage and Temperature support to the STM32 architecture hal
+
+MySensors Library Info
+-------------
 MySensors Library v2.4.0-alpha
 
 Please visit www.mysensors.org for more information
