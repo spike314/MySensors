@@ -21,7 +21,7 @@
  * SX126x driver for MySensors, Copyright (C) 2020 Eduard Iten <eduard@iten.pro>
  * 
  * SX126x driver for MySensors incorporating RadioLib low-level radio communications, https://github.com/jgromes/RadioLib
- * Based in Edward Iten SX126x driver.
+ * Based in Eduard Iten SX126x driver.
  * Copyright (C) 2024 Carl Nagel <carln@hoootch-99.com>
  * 
  */
