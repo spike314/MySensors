@@ -380,16 +380,34 @@ typedef struct {
 #if defined(STM32WLxx)
 STM32WLx radio1 = new STM32WLx_Module();
 // no need to configure pins, signals are routed to the radio internally
-
-// Set RF switch configuration for Seeed E5 module
-// E5 is always High Power Transmit. Antenna setting PA4 1; PA5 0 = receive. PA4 0; PA5 1 = transmit.
-// TODO:  Update for E5-LE MODE_TX_LP when I get one to test
+#if defined(WIOE5LE)
+// Set RF switch configuration for Seeed WIO-E5-LE module
+// E5-LE is always Low Power Transmit. Antenna setting PA4 1; PA5 0 = receive. PA4 0; PA5 1 = transmit.
 static const uint32_t rfswitch_pins[] = {PA4,  PA5, RADIOLIB_NC, RADIOLIB_NC, RADIOLIB_NC};
 static const Module::RfSwitchMode_t rfswitch_table[] = {
+	{STM32WLx::MODE_IDLE,  {LOW,  LOW}},
+	{STM32WLx::MODE_RX,    {HIGH, LOW}},
+	{STM32WLx::MODE_TX_LP, {LOW,  HIGH}},
+	END_OF_MODE_TABLE,
+};
+bool lp_supported = true;
+bool hp_supported = false;
+#elif(WIOE5)
+// Set RF switch configuration for Seeed WIO-E5 module
+// E5 is always High Power Transmit. Antenna setting PA4 1; PA5 0 = receive. PA4 0; PA5 1 = transmit.
+static const uint32_t rfswitch_pins[] = {PA4,  PA5, RADIOLIB_NC, RADIOLIB_NC, RADIOLIB_NC};
+static const Module::RfSwitchMode_t rfswitch_table[] = {
+	{STM32WLx::MODE_IDLE,  {LOW,  LOW}},
 	{STM32WLx::MODE_RX,    {HIGH, LOW}},
 	{STM32WLx::MODE_TX_HP, {LOW,  HIGH}},
 	END_OF_MODE_TABLE,
 };
+bool lp_supported = false;
+bool hp_supported = true;
+#else
+#error Specify Antenna Switch Pins See RLSX126x.h
+#endif //WIOE5LE
+
 #elif (MY_SX126x_VARIANT == 2)
 SX1262 radio1 = new Module(MY_SX126x_CS_PIN, MY_SX126x_IRQ_PIN, MY_SX126x_RESET_PIN,
                            MY_SX126x_BUSY_PIN);
