@@ -392,7 +392,7 @@ static const Module::RfSwitchMode_t rfswitch_table[] = {
 };
 bool lp_supported = true;
 bool hp_supported = false;
-#elif(WIOE5)
+#elif defined (WIOE5)
 // Set RF switch configuration for Seeed WIO-E5 module
 // E5 is always High Power Transmit. Antenna setting PA4 1; PA5 0 = receive. PA4 0; PA5 1 = transmit.
 static const uint32_t rfswitch_pins[] = {PA4,  PA5, RADIOLIB_NC, RADIOLIB_NC, RADIOLIB_NC};
