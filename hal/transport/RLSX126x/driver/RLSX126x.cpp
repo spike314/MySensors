@@ -121,6 +121,7 @@ static bool SX126x_initialise()
 	// set RF switch control configuration
 	// this has to be done prior to calling begin()
 	radio1.setRfSwitchTable(rfswitch_pins, rfswitch_table);
+#undef MY_SX126x_USE_DIO2_ANT_SWITCH
 #else
 #if defined(MY_SX126x_USE_DIO2_ANT_SWITCH) && defined(MY_SX126x_ANT_SWITCH_PIN)
 #error MY_SX126x_USE_DIO2_ANT_SWITCH and MY_SX126x_ANT_SWITCH_PIN both defined which makes no sense
@@ -419,7 +420,7 @@ static void SX126x_rx()
 {
 		SX126x.ackReceived = false;
 		SX126x.dataReceived = false;
-		int16_t status = radio1.startReceive(); 
+		radio1.startReceive(); 
 		SX126x.radioMode = SX126x_MODE_RX;
 }
 
