@@ -101,6 +101,11 @@ static bool SX126x_initialise()
 
 	// Are we using a TCXO and if so, is it controlled by the SX126x
 #if defined(MY_SX126x_USE_TCXO)
+
+#if defined(WIOE5) || defined(WIOE5LE)
+#define MY_SX126x_TCXO_VOLTAGE (1.7)  //This is the TCXO voltage for E5 module
+#endif
+
 #if defined(MY_SX126x_TCXO_VOLTAGE)
 	SX126x_DEBUG(PSTR("SX126x:INIT:DIO3TCXO,VCONF:%02X,DELAY:%ums\n"), MY_SX126x_TCXO_VOLTAGE,
 	             MY_SX126c_TCXO_STARTUP_DELAY);
@@ -111,14 +116,10 @@ static bool SX126x_initialise()
 #define MY_SX126x_TCXO_VOLTAGE 0.0 // RadioLib uses 0.0 if not using TCXO
 #endif // MY_SX126x_USE_TCXO
 
-	// Antenna RX/TX switch logic and TXCO for STM32WL
-	// TODO:  This is really specific to the Wio-E5.  Generalize and 
-	// Make it so it isn't a redefinition
 #if defined(STM32WLxx)
 	// For STM32WL
 	// set RF switch control configuration
 	// this has to be done prior to calling begin()
-#define MY_SX126x_TCXO_VOLTAGE (1.7)  //This is the TCXO voltage for E5 module
 	radio1.setRfSwitchTable(rfswitch_pins, rfswitch_table);
 #else
 #if defined(MY_SX126x_USE_DIO2_ANT_SWITCH) && defined(MY_SX126x_ANT_SWITCH_PIN)
