@@ -102,9 +102,11 @@ static bool SX126x_initialise()
 	// Are we using a TCXO and if so, is it controlled by the SX126x
 #if defined(MY_SX126x_USE_TCXO)
 
-#if defined(WIOE5) || defined(WIOE5LE)
-#define MY_SX126x_TCXO_VOLTAGE (1.7)  //This is the TCXO voltage for E5 module
-#endif
+//#if defined(WIOE5) || defined(WIOE5LE)
+//#define MY_SX126x_TCXO_VOLTAGE (1.7)  //This is the TCXO voltage for E5 module
+//SX126x_DEBUG(PSTR("SX126x:INIT:TCXO Volyshr=%u\n"), MY_SX126x_TCXO_VOLTAGE);
+
+//#endif
 
 #if defined(MY_SX126x_TCXO_VOLTAGE)
 	SX126x_DEBUG(PSTR("SX126x:INIT:DIO3TCXO,VCONF:%02X,DELAY:%ums\n"), MY_SX126x_TCXO_VOLTAGE,
@@ -120,6 +122,7 @@ static bool SX126x_initialise()
 	// For STM32WL
 	// set RF switch control configuration
 	// this has to be done prior to calling begin()
+#define MY_SX126x_TCXO_VOLTAGE (1.7)  //This is the TCXO voltage for E5 module
 	radio1.setRfSwitchTable(rfswitch_pins, rfswitch_table);
 #undef MY_SX126x_USE_DIO2_ANT_SWITCH
 #else
