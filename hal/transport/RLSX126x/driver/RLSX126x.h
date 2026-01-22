@@ -382,12 +382,12 @@ STM32WLx radio1 = new STM32WLx_Module();
 // no need to configure pins, signals are routed to the radio internally
 #if defined(WIOE5LE)
 // Set RF switch configuration for Seeed WIO-E5-LE module
-// E5-LE is always Low Power Transmit. Antenna setting PA4 1; PA5 0 = receive. PA4 0; PA5 1 = transmit.
+// E5-LE is always Low Power Transmit. Antenna setting PA4 1; PA5 0 = receive. PA4 1; PA5 1 = transmit.
 static const uint32_t rfswitch_pins[] = {PA4,  PA5, RADIOLIB_NC, RADIOLIB_NC, RADIOLIB_NC};
 static const Module::RfSwitchMode_t rfswitch_table[] = {
 	{STM32WLx::MODE_IDLE,  {LOW,  LOW}},
 	{STM32WLx::MODE_RX,    {HIGH, LOW}},
-	{STM32WLx::MODE_TX_LP, {LOW,  HIGH}},
+	{STM32WLx::MODE_TX_LP, {HIGH,  HIGH}},
 	END_OF_MODE_TABLE,
 };
 bool lp_supported = true;
