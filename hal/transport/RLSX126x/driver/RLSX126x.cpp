@@ -276,7 +276,9 @@ static bool SX126x_txPower(sx126x_powerLevel_t power)
 #endif
 	radio1.setOutputPower(clippedPower);
 #ifdef STM32WLxx
+#ifndef WIOE5LE // This optimiztion did not seem to help in the LE
 	SX126x_optimizePA(clippedPower);  // optimize PA for powerlevel
+#endif
 #endif
 
 	SX126x.powerLevel = clippedPower;
