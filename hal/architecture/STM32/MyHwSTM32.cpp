@@ -81,7 +81,7 @@ bool hwInit(void)
 	LowPower.begin();
 	return true;
 }
-
+/*
 void hwReadConfigBlock(void *buf, void *addr, size_t length)
 {
 	uint8_t *dst = static_cast<uint8_t *>(buf);
@@ -97,6 +97,7 @@ void hwReadConfigBlock(void *buf, void *addr, size_t length)
 	}
 #endif
 }
+
 
 void hwWriteConfigBlock(void *buf, void *addr, size_t length)
 {
@@ -126,6 +127,36 @@ void hwWriteConfig(const int addr, uint8_t value)
 	if (hwReadConfig(addr) != value) {
 		hwWriteConfigBlock(&value, reinterpret_cast<void *>(addr), 1);
 	}
+}
+*/
+void hwReadConfigBlock(void *buf, void *addr, size_t length)
+{
+	uint8_t *dst = static_cast<uint8_t *>(buf);
+	int pos = reinterpret_cast<int>(addr);
+
+	for (size_t i = 0; i < length; i++) {
+		dst[i] = EEPROM.read(pos + i);
+	}
+}
+
+void hwWriteConfigBlock(void *buf, void *addr, size_t length)
+{
+	uint8_t *src = static_cast<uint8_t *>(buf);
+	int pos = reinterpret_cast<int>(addr);
+
+	for (size_t i = 0; i < length; i++) {
+		EEPROM.update(pos + i, src[i]);
+	}
+}
+
+uint8_t hwReadConfig(const int addr)
+{
+	return EEPROM.read(addr);
+}
+
+void hwWriteConfig(const int addr, uint8_t value)
+{
+	EEPROM.update(addr, value);
 }
 
 int8_t hwSleep(uint32_t ms)
