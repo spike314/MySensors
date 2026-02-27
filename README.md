@@ -1,6 +1,6 @@
-This fork of the MySensors Library adds support for STM32WL series to the development branch
-- Includes Mysensors STM32 archictecture hal for STM32 cube support
-- Adds RLSX126X to the transport hal, which uses the RadioLib library for low level programming to support the STM32WL series
+Prupose of this branch: This branch contains updates needed to deploy MySensors nodes that I am currentyl using. I particular, it has updates for NRF52810 and WIO-E5 (STM32WL) based nodes.
+- Includes Mysensors STM32 archictecture hal for STM32 cube support.  This version is based on KoolRU STM32 MySensors support, and is yet completely aligned wit MySensors development branch.
+- Adds RLSX126X to the transport hal.  This driver uses the RadioLib library for low level programming to support the STM32WL series
 - Adds CPU voltage and Temperature support to the STM32 architecture hal
 
 MySensors Library Info
