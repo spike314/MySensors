@@ -16,6 +16,11 @@
 * modify it under the terms of the GNU General Public License
 * version 2 as published by the Free Software Foundation.
 */
+#ifdef AES
+    #pragma message "Temporarily undefining STM32 AES macro"
+    #undef AES
+	#define AESWL
+#endif
 
 #include "MyCryptoGeneric.h"
 
@@ -43,3 +48,9 @@ void AES128CBCDecrypt(uint8_t *iv, uint8_t *buffer, const size_t dataLength)
 {
 	_aes.cbc_decrypt((byte *)buffer, (byte *)buffer, dataLength / 16, iv);
 }
+
+#ifdef AESWL  // Restore if needed elsewhere
+    #define AES 
+	#undef AESWL
+	#pragma message "Redefining STM32 AES macro"
+#endif
