@@ -398,9 +398,11 @@ static bool hwSleepInit(void)
 	__DSB();
 #else
 	// Modern STM32 (F2/F3/F4/F7/L0/L1/L4/L5/G0/G4/H7)
+#if !defined(STM32WLxx)
 	__HAL_RCC_PWR_CLK_ENABLE();
+#endif // !STM32WLxx
 	HAL_PWR_EnableBkUpAccess();
-#endif
+#endif // else
 
 	// ---- Reset backup domain if RTC not already configured ----
 	if ((RCC->BDCR & RCC_BDCR_RTCEN) == 0) {
@@ -412,7 +414,19 @@ static bool hwSleepInit(void)
 
 	// ---- Select RTC clock source: try LSE, fall back to LSI ----
 	bool useLSE = false;
-
+#ifdef STM32WLxx
+	/* Check if LSE is ready */
+	if (__HAL_RCC_GET_FLAG(RCC_FLAG_LSERDY)) {
+		useLSE = true;
+	} else {
+		/* Check if LSI is ready */
+		if (__HAL_RCC_GET_FLAG(RCC_FLAG_LSIRDY)) {
+			useLSE = false;
+		} else {
+			return false;  // Both LSE and LSI failed
+		}
+	}
+#else
 	if ((RCC->BDCR & RCC_BDCR_LSERDY) != 0) {
 		useLSE = true;
 	} else {
@@ -439,8 +453,21 @@ static bool hwSleepInit(void)
 			}
 		}
 	}
-
+#endif
 	// ---- Configure RTC clock source ----
+#ifdef STM32WLxx
+	RCC_PeriphCLKInitTypeDef  periphClk = {0};
+	periphClk.PeriphClockSelection = RCC_PERIPHCLK_RTC;
+	periphClk.RTCClockSelection    = useLSE ? RCC_RTCCLKSOURCE_LSE :  RCC_RTCCLKSOURCE_LSI;
+	if (HAL_RCCEx_PeriphCLKConfig(&periphClk) != HAL_OK) {
+		return false;
+	}
+
+	/* ---- Enable the RTC peripheral clock ---- */
+	__HAL_RCC_RTC_ENABLE();
+	__HAL_RCC_RTCAPB_CLK_ENABLE();
+
+#else
 	uint32_t currentRtcSel = (RCC->BDCR & RCC_BDCR_RTCSEL);
 	uint32_t desiredRtcSel = useLSE ? RCC_BDCR_RTCSEL_0 : RCC_BDCR_RTCSEL_1;
 
@@ -451,7 +478,7 @@ static bool hwSleepInit(void)
 		RCC->BDCR |= desiredRtcSel;
 	}
 	RCC->BDCR |= RCC_BDCR_RTCEN;
-
+#endif
 	// ---- Initialize RTC peripheral ----
 	hrtc.Instance = RTC;
 
@@ -518,6 +545,32 @@ static bool hwSleepInit(void)
 	// Configure interrupt for RTC wake_up timer
 	HAL_NVIC_SetPriority(RTC_TAMP_IRQn, 0, 0);
 	HAL_NVIC_EnableIRQ(RTC_TAMP_IRQn);
+#elif defined(STM32WLxx)
+	hrtc.Instance            = RTC;
+	hrtc.Init.HourFormat     = RTC_HOURFORMAT_24;
+
+	/* Select prescaler values based on clock source */
+	if (useLSE) {
+		hrtc.Init.AsynchPrediv   = 127;        /* 32768 / 128 = 256 Hz        */
+		hrtc.Init.SynchPrediv    = 255;        /* 256 / 256   = 1 Hz calendar */
+	} else {
+		hrtc.Init.AsynchPrediv   = 127;        /* 32000 / 128 = 250 Hz        */
+		hrtc.Init.SynchPrediv    = 249;        /* 250 / 250   = 1 Hz calendar */
+	}
+
+	hrtc.Init.OutPut         = RTC_OUTPUT_DISABLE;
+	hrtc.Init.OutPutPolarity = RTC_OUTPUT_POLARITY_HIGH;
+	hrtc.Init.OutPutType     = RTC_OUTPUT_TYPE_OPENDRAIN;
+	hrtc.Init.OutPutRemap    = RTC_OUTPUT_REMAP_NONE;
+	hrtc.Init.OutPutPullUp   = RTC_OUTPUT_PULLUP_NONE;
+	hrtc.Init.BinMode        = RTC_BINARY_NONE;
+	if (hrtc.State == HAL_RTC_STATE_RESET) {
+		if (HAL_RTC_Init(&hrtc) != HAL_OK) {
+			return false;
+		}
+	} else {
+		hrtc.State = HAL_RTC_STATE_READY;
+	}
 
 #else
 	// ============================================================
@@ -608,7 +661,7 @@ static bool hwSleepConfigureTimer(uint32_t ms)
 	// Enable alarm interrupt in RTC
 	RTC->CRH |= RTC_CRH_ALRIE;
 
-#elif defined(STM32U0xx)
+#elif defined(STM32U0xx)  || defined(STM32WLxx)
 	// ============================================================
 	// STM32U0: Use wake-up timer
 	// ============================================================
@@ -639,9 +692,23 @@ static bool hwSleepConfigureTimer(uint32_t ms)
 		}
 	}
 
+#if defined(STM32WLxx)
+  	// Clear WUTE + WUTIE flags
+  	HAL_RTCEx_DeactivateWakeUpTimer(&hrtc);
+#endif
+
 	if (HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, wakeUpCounter, wakeUpClock, 0) != HAL_OK) {
 		return false;
 	}
+#if defined(STM32WLxx)
+#if defined(CORE_CM0PLUS) // Dual Core STM32WL
+  	HAL_NVIC_SetPriority(RTC_LSECSS_IRQn, 0, 0);
+  	HAL_NVIC_EnableIRQ(RTC_LSECSS_IRQn);
+#else // Single Core STM32WL
+  	HAL_NVIC_SetPriority(RTC_WKUP_IRQn, 0, 0);
+  	HAL_NVIC_EnableIRQ(RTC_WKUP_IRQn);
+#endif // CORE_CM0Plus
+#endif // STM32WLxx
 
 #else
 	// ============================================================
@@ -724,6 +791,21 @@ extern "C" void RTC_TAMP_IRQHandler(void)
 {
 	HAL_RTCEx_WakeUpTimerIRQHandler(&hrtc);
 }
+#elif defined(STM32WLxx)
+
+#if defined(CORE_CM0PLUS)  // Dual processor STM32WL
+extern "C" void RTC_LSECSS_IRQHandler(void)
+#else
+extern "C" void RTC_WKUP_IRQHandler(void)
+#endif
+{
+  HAL_RTCEx_WakeUpTimerIRQHandler(&hrtc);
+}
+extern "C" void HAL_RTCEx_WakeUpTimerEventCallback(RTC_HandleTypeDef * /* hrtc */)
+{
+  /* intentionally empty – wake-up is the only action needed */
+}
+
 #else
 extern "C" void RTC_WKUP_IRQHandler(void)
 {
