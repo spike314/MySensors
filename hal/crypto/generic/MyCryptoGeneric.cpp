@@ -17,15 +17,15 @@
 * version 2 as published by the Free Software Foundation.
 */
 #ifdef AES
-    #pragma message "Temporarily undefining STM32 AES macro"
-    #undef AES
-	#define AESWL
+	#pragma push_macro("AES") // Save STM32 AES Macro
+	#undef AES // Allow MySensors AES compilation to proceed 
+	#define __STM32_AES_SAVED
 #endif
 
 #include "MyCryptoGeneric.h"
 
 void SHA256HMAC(uint8_t *dest, const uint8_t *key, size_t keyLength, const uint8_t *data,
-                size_t dataLength)
+				size_t dataLength)
 {
 	SHA256HMACInit(key, keyLength);
 	SHA256HMACAdd(data, dataLength);
@@ -49,8 +49,7 @@ void AES128CBCDecrypt(uint8_t *iv, uint8_t *buffer, const size_t dataLength)
 	_aes.cbc_decrypt((byte *)buffer, (byte *)buffer, dataLength / 16, iv);
 }
 
-#ifdef AESWL  // Restore if needed elsewhere
-    #define AES 
-	#undef AESWL
-	#pragma message "Redefining STM32 AES macro"
+#ifdef __STM32_AES_SAVED
+	#pragma pop_macro("AES") // Restore STM32 AES Macro
+	#undef __STM32_AES_SAVED
 #endif

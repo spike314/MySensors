@@ -309,7 +309,7 @@ int8_t hwCPUTemperature(void)
 
 	if (cal110 != cal30) {
 		int32_t temp = 30 + ((110 - 30) * (temp_raw - (int32_t)cal30)) /
-		               ((int32_t)cal110 - (int32_t)cal30);
+					   ((int32_t)cal110 - (int32_t)cal30);
 
 		temp = ((temp - MY_STM32_TEMPERATURE_OFFSET) * 100) / MY_STM32_TEMPERATURE_GAIN;
 		return (int8_t)temp;
@@ -399,7 +399,7 @@ static bool hwSleepInit(void)
 #else
 	// Modern STM32 (F2/F3/F4/F7/L0/L1/L4/L5/G0/G4/H7)
 #if !defined(STM32WLxx)
-	__HAL_RCC_PWR_CLK_ENABLE();
+	__HAL_RCC_PWR_CLK_ENABLE(); // N/A for STM32WL. Clock is alway on.
 #endif // !STM32WLxx
 	HAL_PWR_EnableBkUpAccess();
 #endif // else
@@ -423,7 +423,16 @@ static bool hwSleepInit(void)
 		if (__HAL_RCC_GET_FLAG(RCC_FLAG_LSIRDY)) {
 			useLSE = false;
 		} else {
-			return false;  // Both LSE and LSI failed
+			// Neither ready — try enabling LSI as fallback
+			__HAL_RCC_LSI_ENABLE();
+			uint32_t timeout = 1000000;
+			while (!__HAL_RCC_GET_FLAG(RCC_FLAG_LSIRDY) && (timeout > 0)) {
+				timeout--;
+			}
+			if (timeout == 0) {
+				return false;
+			}
+			useLSE = false;
 		}
 	}
 #else
@@ -546,7 +555,6 @@ static bool hwSleepInit(void)
 	HAL_NVIC_SetPriority(RTC_TAMP_IRQn, 0, 0);
 	HAL_NVIC_EnableIRQ(RTC_TAMP_IRQn);
 #elif defined(STM32WLxx)
-	hrtc.Instance            = RTC;
 	hrtc.Init.HourFormat     = RTC_HOURFORMAT_24;
 
 	/* Select prescaler values based on clock source */
@@ -564,13 +572,22 @@ static bool hwSleepInit(void)
 	hrtc.Init.OutPutRemap    = RTC_OUTPUT_REMAP_NONE;
 	hrtc.Init.OutPutPullUp   = RTC_OUTPUT_PULLUP_NONE;
 	hrtc.Init.BinMode        = RTC_BINARY_NONE;
-	if (hrtc.State == HAL_RTC_STATE_RESET) {
+	if ((RTC->ICSR & RTC_ICSR_INITS) == 0) {
 		if (HAL_RTC_Init(&hrtc) != HAL_OK) {
 			return false;
 		}
 	} else {
 		hrtc.State = HAL_RTC_STATE_READY;
 	}
+
+	// Configure interrupt for RTC wake_up timer
+#if defined(CORE_CM0PLUS) // Dual Core STM32WL
+  	HAL_NVIC_SetPriority(RTC_LSECSS_IRQn, 0, 0);
+  	HAL_NVIC_EnableIRQ(RTC_LSECSS_IRQn);
+#else // Single Core STM32WL
+  	HAL_NVIC_SetPriority(RTC_WKUP_IRQn, 0, 0);
+  	HAL_NVIC_EnableIRQ(RTC_WKUP_IRQn);
+#endif // CORE_CM0Plus
 
 #else
 	// ============================================================
@@ -663,7 +680,7 @@ static bool hwSleepConfigureTimer(uint32_t ms)
 
 #elif defined(STM32U0xx)  || defined(STM32WLxx)
 	// ============================================================
-	// STM32U0: Use wake-up timer
+	// STM32U0 & STM32WL: Use wake-up timer
 	// ============================================================
 	// STM32U0 HAL requires a 4th argument: WakeUpAutoClr (auto-clear of wakeup flag)
 
@@ -693,22 +710,13 @@ static bool hwSleepConfigureTimer(uint32_t ms)
 	}
 
 #if defined(STM32WLxx)
-  	// Clear WUTE + WUTIE flags
+  	// Clear wakeup flag (WUTE + WUTIE) for STM32WL 
   	HAL_RTCEx_DeactivateWakeUpTimer(&hrtc);
 #endif
 
 	if (HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, wakeUpCounter, wakeUpClock, 0) != HAL_OK) {
 		return false;
 	}
-#if defined(STM32WLxx)
-#if defined(CORE_CM0PLUS) // Dual Core STM32WL
-  	HAL_NVIC_SetPriority(RTC_LSECSS_IRQn, 0, 0);
-  	HAL_NVIC_EnableIRQ(RTC_LSECSS_IRQn);
-#else // Single Core STM32WL
-  	HAL_NVIC_SetPriority(RTC_WKUP_IRQn, 0, 0);
-  	HAL_NVIC_EnableIRQ(RTC_WKUP_IRQn);
-#endif // CORE_CM0Plus
-#endif // STM32WLxx
 
 #else
 	// ============================================================
@@ -830,11 +838,11 @@ uint32_t hwGetSleepRemaining(void)
  * @return Wake-up source or error code
  */
 static int8_t hwSleepInternal(const uint8_t interrupt1, const uint8_t mode1,
-                              const uint8_t interrupt2, const uint8_t mode2,
-                              uint32_t ms)
+							  const uint8_t interrupt2, const uint8_t mode2,
+							  uint32_t ms)
 {
 	bool hasInterrupt = (interrupt1 != INVALID_INTERRUPT_NUM) ||
-	                    (interrupt2 != INVALID_INTERRUPT_NUM);
+						(interrupt2 != INVALID_INTERRUPT_NUM);
 
 	// Reject timer-only sleep with ms=0 (would sleep forever with no wake source)
 	if (ms == 0 && !hasInterrupt) {
@@ -986,7 +994,7 @@ int8_t hwSleep(const uint8_t interrupt, const uint8_t mode, uint32_t ms)
 }
 
 int8_t hwSleep(const uint8_t interrupt1, const uint8_t mode1,
-               const uint8_t interrupt2, const uint8_t mode2, uint32_t ms)
+			   const uint8_t interrupt2, const uint8_t mode2, uint32_t ms)
 {
 	return hwSleepInternal(interrupt1, mode1, interrupt2, mode2, ms);
 }
