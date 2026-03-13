@@ -264,6 +264,12 @@ bool hwUniqueID(unique_id_t *uniqueID)
 
 uint16_t hwCPUVoltage(void)
 {
+	// For STM32WL, STM32U0 and others that define helper macro
+#if defined(__HAL_ADC_CALC_VREFANALOG_VOLTAGE)
+	analogReadResolution(12);
+	uint32_t vrefint = analogRead(AVREF);
+	return (uint16_t) __HAL_ADC_CALC_VREFANALOG_VOLTAGE(vrefint, LL_ADC_RESOLUTION_12B);
+#else	
 #if defined(AVREF) && defined(__HAL_RCC_ADC1_CLK_ENABLE)
 	// Force 12-bit resolution for predictable raw values
 	analogReadResolution(12);
@@ -281,7 +287,8 @@ uint16_t hwCPUVoltage(void)
 		return (uint16_t)((1200UL * 4095UL) / vrefint);
 #endif
 	}
-#endif
+#endif // AVREF and __HAL_RCC . . .
+#endif // __HAL_ADC  . . .
 
 	return 3300;
 }
@@ -295,6 +302,11 @@ uint16_t hwCPUFrequency(void)
 
 int8_t hwCPUTemperature(void)
 {
+#if defined(__HAL_ADC_CALC_TEMPERATURE) // Use helper macro for STM32WL and some others
+  	int32_t VRef = hwCPUVoltage();
+	return (int8_t) __HAL_ADC_CALC_TEMPERATURE(VRef, analogRead(ATEMP), LL_ADC_RESOLUTION_12B );
+#else
+
 	// cppcheck-suppress knownConditionTrueFalse
 	int32_t temp_raw = hwReadInternalTemp();
 
@@ -328,6 +340,7 @@ int8_t hwCPUTemperature(void)
 #endif
 
 	return (int8_t)(((temp - MY_STM32_TEMPERATURE_OFFSET) * 100) / MY_STM32_TEMPERATURE_GAIN);
+#endif // defined __HAL_ADC . . .
 }
 
 extern "C" caddr_t _sbrk(int incr);
