@@ -288,7 +288,7 @@ uint16_t hwCPUVoltage(void)
 #endif
 	}
 #endif // AVREF and __HAL_RCC . . .
-#endif // __HAL_ADC  . . .
+#endif // __HAL_ADC_CALC_VREFANALOG_VOLTAGE
 
 	return 3300;
 }
@@ -321,7 +321,7 @@ int8_t hwCPUTemperature(void)
 
 	if (cal110 != cal30) {
 		int32_t temp = 30 + ((110 - 30) * (temp_raw - (int32_t)cal30)) /
-					   ((int32_t)cal110 - (int32_t)cal30);
+		               ((int32_t)cal110 - (int32_t)cal30);
 
 		temp = ((temp - MY_STM32_TEMPERATURE_OFFSET) * 100) / MY_STM32_TEMPERATURE_GAIN;
 		return (int8_t)temp;
@@ -340,7 +340,7 @@ int8_t hwCPUTemperature(void)
 #endif
 
 	return (int8_t)(((temp - MY_STM32_TEMPERATURE_OFFSET) * 100) / MY_STM32_TEMPERATURE_GAIN);
-#endif // defined __HAL_ADC . . .
+#endif // defined __HAL_ADC_CALC_TEMPERATURE
 }
 
 extern "C" caddr_t _sbrk(int incr);
@@ -415,7 +415,7 @@ static bool hwSleepInit(void)
 	__HAL_RCC_PWR_CLK_ENABLE(); // N/A for STM32WL. Clock is alway on.
 #endif // !STM32WLxx
 	HAL_PWR_EnableBkUpAccess();
-#endif // else
+#endif
 
 	// ---- Reset backup domain if RTC not already configured ----
 	if ((RCC->BDCR & RCC_BDCR_RTCEN) == 0) {
@@ -525,11 +525,6 @@ static bool hwSleepInit(void)
 	RTC->CRL &= ~RTC_CRL_ALRF;
 	EXTI->PR = EXTI_PR_PR17;
 	NVIC_ClearPendingIRQ(RTC_Alarm_IRQn);
-
-	// Configure EXTI line 17 for RTC Alarm wake-up from STOP mode
-	// Without EXTI, the alarm flag is set but the CPU does not wake
-	EXTI->IMR |= EXTI_IMR_MR17;     // Unmask EXTI line 17
-	EXTI->RTSR |= EXTI_RTSR_TR17;   // Rising edge trigger
 
 	HAL_NVIC_SetPriority(RTC_Alarm_IRQn, 0, 0);
 	HAL_NVIC_EnableIRQ(RTC_Alarm_IRQn);
@@ -851,11 +846,11 @@ uint32_t hwGetSleepRemaining(void)
  * @return Wake-up source or error code
  */
 static int8_t hwSleepInternal(const uint8_t interrupt1, const uint8_t mode1,
-							  const uint8_t interrupt2, const uint8_t mode2,
-							  uint32_t ms)
+                              const uint8_t interrupt2, const uint8_t mode2,
+                              uint32_t ms)
 {
 	bool hasInterrupt = (interrupt1 != INVALID_INTERRUPT_NUM) ||
-						(interrupt2 != INVALID_INTERRUPT_NUM);
+	                    (interrupt2 != INVALID_INTERRUPT_NUM);
 
 	// Reject timer-only sleep with ms=0 (would sleep forever with no wake source)
 	if (ms == 0 && !hasInterrupt) {
@@ -910,6 +905,10 @@ static int8_t hwSleepInternal(const uint8_t interrupt1, const uint8_t mode1,
 		// Clear all wake-up flags before entering STOP mode
 #if defined(STM32F1xx)
 		RTC->CRL &= ~RTC_CRL_ALRF;
+		// Configure EXTI line 17 for RTC Alarm wake-up from STOP mode
+		// Without EXTI, the alarm flag is set but the CPU does not wake
+		EXTI->IMR |= EXTI_IMR_MR17;     // Unmask EXTI line 17
+		EXTI->RTSR |= EXTI_RTSR_TR17;   // Rising edge trigger
 		EXTI->PR = EXTI_PR_PR17;
 		NVIC_ClearPendingIRQ(RTC_Alarm_IRQn);
 #else
@@ -1007,7 +1006,7 @@ int8_t hwSleep(const uint8_t interrupt, const uint8_t mode, uint32_t ms)
 }
 
 int8_t hwSleep(const uint8_t interrupt1, const uint8_t mode1,
-			   const uint8_t interrupt2, const uint8_t mode2, uint32_t ms)
+               const uint8_t interrupt2, const uint8_t mode2, uint32_t ms)
 {
 	return hwSleepInternal(interrupt1, mode1, interrupt2, mode2, ms);
 }
