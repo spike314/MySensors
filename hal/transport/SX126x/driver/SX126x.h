@@ -144,7 +144,12 @@
 #define SX126x_BROADCAST_ADDRESS (255u)	 //!< Broadcasting address
 #define SX126x_ATC_TARGET_RANGE_DBM (2u) //!< ATC target range +/- dBm
 #define SX126x_RSSI_OFFSET (137u)		 //!< RSSI offset
+
+#ifndef SX126x_SPY
 #define SX126x_PROMISCUOUS (false)		 //!< SX126x promiscuous mode
+#else
+#define SX126x_PROMISCUOUS (false)		 //!< SX126x promiscuous mode
+#endif
 
 #if (MY_SX126x_MAX_POWER_LEVEL_DBM) <= (MY_SX126x_MIN_POWER_LEVEL_DBM)
 #error SX126x_MAX_POWER_DBM has to be bigger than SX126x_MIN_POWER_DBM

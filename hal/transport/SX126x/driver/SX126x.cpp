@@ -31,6 +31,12 @@
 #define SX126x_DEBUG(x, ...) //!< DEBUG null
 #endif
 
+#if defined(SX126x_SPY)
+#define SX126x_SPY(x, ...) DEBUG_OUTPUT(x, ##__VA_ARGS__) //!< Debug print
+#else
+#define SX126x_SPY(x, ...) //!< DEBUG null
+#endif
+
 //Global status variable
 static sx126x_internal_t SX126x;
 const uint8_t clampLP = 0xC8; // default
@@ -588,7 +594,7 @@ static bool SX126x_sendWithRetry(const uint8_t recipient, const void *buffer,
 		if (SX126x.ATCenabled) {
 			SX126x_txPower(SX126x.powerLevel + 2); //increase power, maybe we are far away from gateway
 		}
-	}
+	} 
 	return false;
 }
 
@@ -654,7 +660,7 @@ static void SX126x_readBuffer(const uint8_t offset, uint8_t *buffer, const uint8
 }
 
 static void SX126x_tx()
-{
+{ 
 #ifdef MY_SX126x_ANT_SWITCH_PIN
 	hwDigitalWrite(MY_SX126x_ANT_SWITCH_PIN, HIGH);
 #endif
@@ -808,12 +814,21 @@ static uint8_t SX126x_getData(uint8_t *buffer, const uint8_t bufferSize)
 		// delay for fast GW and slow nodes
 		delay(50);
 #endif
+#ifndef SX126x_SPY
 		SX126x_sendAck(
 		    SX126x.currentPacket.header.sender,
 		    SX126x.currentPacket.header.sequenceNumber,
 		    SX126x.currentPacket.RSSI,
 		    SX126x.currentPacket.SNR);
+#endif
+					SX126x_SPY(PSTR("SX126x:SWR:ACK FROM=%u,TO=%u,SEQ=%u,RSSI=%d,SNR:%d\n"),
+					             SX126x.currentPacket.header.recipient,
+					             SX126x.currentPacket.header.sender,
+					             SX126x.currentPacket.ACK.sequenceNumber,
+					             SX126x_internalToRSSI(SX126x.currentPacket.RSSI),
+					             SX126x_internalToSNR(SX126x.currentPacket.SNR));
 	}
+
 	return payloadSize;
 }
 

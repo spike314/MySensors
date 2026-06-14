@@ -40,7 +40,11 @@ uint8_t transportGetAddress(void)
 
 bool transportSend(const uint8_t to, const void *data, const uint8_t len, const bool noACK)
 {
+#ifndef SX126x_SPY
 	return SX126x_sendWithRetry(to, data, len, noACK);
+#else
+	return true;
+#endif
 }
 
 bool transportDataAvailable(void)
