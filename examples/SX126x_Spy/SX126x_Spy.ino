@@ -46,6 +46,7 @@
 
 // Enable debug prints to serial monitor
 #define MY_DEBUG
+// #define MY_DEBUG_VERBOSE_GATEWAY
 
 // Enable and select radio type attached
 #define MY_RADIO_SX126x

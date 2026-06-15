@@ -244,6 +244,22 @@ static void SX126x_handle()
 				SX126x_readCommand(SX126x_GET_PACKETSTATUS, packetStatus.values, 3);
 				SX126x.currentPacket.RSSI = SX126x_RSSItoInternal(-packetStatus.fields.rawRssiPkt / 2);
 				SX126x.currentPacket.SNR = packetStatus.fields.rawSnrPkt;
+#ifdef SX126x_SPY
+				if(SX126x.currentPacket.header.controlFlags.fields.ackReceived) {
+					SX126x_SPY(PSTR(",ACK,RSSI=%d,SNR=%d, 0;255;3;0;9;%u TSF:MSG:ACK_,%u-%u-%u\n"),
+					             SX126x_internalToRSSI(SX126x.currentPacket.RSSI),
+					             SX126x_internalToSNR(SX126x.currentPacket.SNR),
+								 millis(),
+								SX126x.currentPacket.header.sender,
+								SX126x.currentPacket.header.sender,
+					             SX126x.currentPacket.header.recipient);
+				}
+				else {
+					SX126x_SPY(PSTR(",MSG,RSSI=%d,SNR=%d, "),
+					             SX126x_internalToRSSI(SX126x.currentPacket.RSSI),
+					             SX126x_internalToSNR(SX126x.currentPacket.SNR));
+				}
+#endif
 				if ((SX126x.currentPacket.header.version >= SX126x_MIN_PACKET_HEADER_VERSION) &&
 				        (SX126x_PROMISCUOUS || SX126x.currentPacket.header.recipient == SX126x.address ||
 				         SX126x.currentPacket.header.recipient == SX126x_BROADCAST_ADDRESS)) {
@@ -821,12 +837,6 @@ static uint8_t SX126x_getData(uint8_t *buffer, const uint8_t bufferSize)
 		    SX126x.currentPacket.RSSI,
 		    SX126x.currentPacket.SNR);
 #endif
-					SX126x_SPY(PSTR("SX126x:SWR:ACK FROM=%u,TO=%u,SEQ=%u,RSSI=%d,SNR:%d\n"),
-					             SX126x.currentPacket.header.recipient,
-					             SX126x.currentPacket.header.sender,
-					             SX126x.currentPacket.ACK.sequenceNumber,
-					             SX126x_internalToRSSI(SX126x.currentPacket.RSSI),
-					             SX126x_internalToSNR(SX126x.currentPacket.SNR));
 	}
 
 	return payloadSize;
