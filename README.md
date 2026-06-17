@@ -1,5 +1,11 @@
 MySensors Library v2.4.0-rc.1
 
+**SPY Branch.  Not for production. **
+This has code to build a node that listens for all the trafic on my LoRa 915MHz network.
+It disables gateway output, so it just outputs debug messages.
+Just for debugging use only.
+------
+
 Please visit www.mysensors.org for more information
 
 Current version in Arduino IDE [![arduino-library-badge](https://www.ardu-badge.com/badge/MySensors.svg)](https://www.ardu-badge.com/MySensors)
