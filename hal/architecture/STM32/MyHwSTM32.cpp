@@ -56,7 +56,7 @@ static volatile uint8_t _wakeUp2Interrupt = INVALID_INTERRUPT_NUM;
 static uint32_t sleepRemainingMs = 0ul;
 
 // RTC handle for wake-up timer
-static RTC_HandleTypeDef hrtc = {0};
+static RTC_HandleTypeDef hrtc = {};
 static bool rtcInitialized = false;
 
 // Forward declarations for sleep helper functions
@@ -373,10 +373,10 @@ static uint32_t hwRtcGetCounter(void)
 #else
 	// Modern STM32: use HAL to get time and compute seconds since epoch
 	// For sleep remaining calculation, we only need relative elapsed seconds
-	RTC_TimeTypeDef sTime = {0};
+	RTC_TimeTypeDef sTime = {};
 	HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
 	// Must read date after time to unlock shadow registers
-	RTC_DateTypeDef sDate = {0};
+	RTC_DateTypeDef sDate = {};
 	HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
 	uint32_t prediv_s = hrtc.Init.SynchPrediv;  // e.g. 255
 	uint32_t elapsed_subsec_ms = ((prediv_s - sTime.SubSeconds) * 1000) / (prediv_s + 1);
@@ -481,7 +481,7 @@ static bool hwSleepInit(void)
 #endif
 	// ---- Configure RTC clock source ----
 #ifdef STM32WLxx
-	RCC_PeriphCLKInitTypeDef  periphClk = {0};
+	RCC_PeriphCLKInitTypeDef  periphClk = {};
 	periphClk.PeriphClockSelection = RCC_PERIPHCLK_RTC;
 	periphClk.RTCClockSelection    = useLSE ? RCC_RTCCLKSOURCE_LSE :  RCC_RTCCLKSOURCE_LSI;
 	if (HAL_RCCEx_PeriphCLKConfig(&periphClk) != HAL_OK) {

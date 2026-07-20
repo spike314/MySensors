@@ -325,7 +325,7 @@ static void SX126x_busy(void)
 static void SX126x_sleep(void)
 {
 	SX126x_deviceReady();
-	sx126x_sleepParams_t sleepParams = { 0 };
+	sx126x_sleepParams_t sleepParams = {};
 	sleepParams.fields.warmStart = true;
 	SX126x_sendCommand(SX126x_SET_SLEEP, &sleepParams.value, sizeof(sleepParams.value));
 	delayMicroseconds(500);
@@ -542,7 +542,7 @@ static uint8_t SX126x_getAddress(void)
 static bool SX126x_sendWithRetry(const uint8_t recipient, const void *buffer,
                                  const uint8_t bufferSize, const bool noACK)
 {
-	sx126x_controlFlags_t flags{ 0 };
+	sx126x_controlFlags_t flags{};
 	flags.fields.ackRequested = !noACK;
 	SX126x.txSequenceNumber++;
 	for (uint8_t retry = 0; retry < SX126x_RETRIES; retry++) {
@@ -829,7 +829,7 @@ static void SX126x_sendAck(const uint8_t recipient, const sx126x_sequenceNumber_
 	ACK.sequenceNumber = sequenceNumber;
 	ACK.RSSI = RSSI;
 	ACK.SNR = SNR;
-	sx126x_controlFlags_t flags = { 0 };
+	sx126x_controlFlags_t flags = {};
 	flags.fields.ackReceived = true;
 	flags.fields.ackRssiReport = true;
 	(void)SX126x_send(recipient, (uint8_t *)&ACK, sizeof(sx126x_ack_t), flags);
